@@ -385,3 +385,515 @@ add_action( 'set_user_role', function( $user_id ) {
     $user = get_userdata( $user_id );
     error_log( 'ROLE CHANGE ROLES: ' . print_r( $user->roles, true ) );
 }, 20 );
+
+// ============ VENDOR STORIES FEATURE ============
+
+// Register Custom Post Type: vendor_story
+function grabtogo_register_vendor_stories_cpt() {
+    register_post_type( 'vendor_story', [
+        'labels' => [
+            'name'          => 'Vendor Stories',
+            'singular_name' => 'Vendor Story',
+            'add_new'       => 'Add Story',
+            'add_new_item'  => 'Add New Story',
+            'edit_item'     => 'Edit Story',
+            'new_item'      => 'New Story',
+            'view_item'     => 'View Story',
+            'search_items'  => 'Search Stories',
+            'not_found'     => 'No stories found',
+            'all_items'     => 'All Stories'
+        ],
+        'public'        => false,
+        'show_ui'       => true,
+        'show_in_menu'  => 'edit.php?post_type=listing',
+        'supports'      => [ 'title', 'editor', 'thumbnail', 'author' ],
+        'meta_box_cb'   => false,
+        'capability_type' => 'post',
+        'map_meta_cap'  => true,
+    ]);
+}
+add_action( 'init', 'grabtogo_register_vendor_stories_cpt' );
+
+// Add story meta boxes
+function grabtogo_add_story_meta_boxes() {
+    add_meta_box(
+        'story_details',
+        'Story Details',
+        'grabtogo_story_meta_box_callback',
+        'vendor_story',
+        'normal',
+        'high'
+    );
+}
+add_action( 'add_meta_boxes', 'grabtogo_add_story_meta_boxes' );
+
+function grabtogo_story_meta_box_callback( $post ) {
+    wp_nonce_field( 'story_meta_box', 'story_meta_box_nonce' );
+    
+    $vendor_id = get_post_meta( $post->ID, '_story_vendor_id', true );
+    $city = get_post_meta( $post->ID, '_story_city', true );
+    $expiry = get_post_meta( $post->ID, '_story_expiry', true );
+    $media_url = get_post_meta( $post->ID, '_story_media_url', true );
+    
+    echo '<table class="form-table">';
+    echo '<tr><th><label for="story_vendor_id">Vendor ID:</label></th>';
+    echo '<td><input type="number" id="story_vendor_id" name="story_vendor_id" value="' . esc_attr( $vendor_id ) . '" /></td></tr>';
+    
+    echo '<tr><th><label for="story_city">City:</label></th>';
+    echo '<td><input type="text" id="story_city" name="story_city" value="' . esc_attr( $city ) . '" /></td></tr>';
+    
+    echo '<tr><th><label for="story_expiry">Expiry Date:</label></th>';
+    echo '<td><input type="datetime-local" id="story_expiry" name="story_expiry" value="' . esc_attr( $expiry ) . '" /></td></tr>';
+    
+    echo '<tr><th><label for="story_media_url">Media URL:</label></th>';
+    echo '<td><input type="url" id="story_media_url" name="story_media_url" value="' . esc_attr( $media_url ) . '" /></td></tr>';
+    echo '</table>';
+}
+
+// Save story meta
+function grabtogo_save_story_meta( $post_id ) {
+    if ( ! isset( $_POST['story_meta_box_nonce'] ) || ! wp_verify_nonce( $_POST['story_meta_box_nonce'], 'story_meta_box' ) ) {
+        return;
+    }
+    
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+        return;
+    }
+    
+    if ( ! current_user_can( 'edit_post', $post_id ) ) {
+        return;
+    }
+    
+    $fields = [ '_story_vendor_id', '_story_city', '_story_expiry', '_story_media_url' ];
+    foreach ( $fields as $field ) {
+        $key = str_replace( '_story_', '', $field );
+        if ( isset( $_POST[ $key ] ) ) {
+            update_post_meta( $post_id, $field, sanitize_text_field( $_POST[ $key ] ) );
+        }
+    }
+}
+add_action( 'save_post', 'grabtogo_save_story_meta' );
+
+// AJAX: Upload story from vendor dashboard
+function gtg_upload_vendor_story() {
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( 'Please log in.' );
+    }
+    
+    $user_id = get_current_user_id();
+    $caption = sanitize_textarea_field( $_POST['caption'] ?? '' );
+    $expiry_hours = intval( $_POST['expiry_hours'] ?? 24 );
+    $user_city = get_user_meta( $user_id, 'gtg_shop_city', true );
+    
+    // Handle file upload
+    if ( ! function_exists( 'wp_handle_upload' ) ) {
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+    }
+    
+    $uploadedfile = $_FILES['story_media'];
+    $upload_overrides = [ 'test_form' => false ];
+    $movefile = wp_handle_upload( $uploadedfile, $upload_overrides );
+    
+    if ( $movefile && ! isset( $movefile['error'] ) ) {
+        // Create story post
+        $story_id = wp_insert_post([
+            'post_type'    => 'vendor_story',
+            'post_title'   => 'Story by ' . get_user_meta( $user_id, 'gtg_shop_name', true ),
+            'post_content' => $caption,
+            'post_author'  => $user_id,
+            'post_status'  => 'publish',
+        ]);
+        
+        if ( $story_id ) {
+            // Set expiry timestamp
+            $expiry_timestamp = date( 'Y-m-d H:i:s', strtotime( "+{$expiry_hours} hours" ) );
+            
+            // Save meta
+            update_post_meta( $story_id, '_story_vendor_id', $user_id );
+            update_post_meta( $story_id, '_story_city', $user_city );
+            update_post_meta( $story_id, '_story_expiry', $expiry_timestamp );
+            update_post_meta( $story_id, '_story_media_url', $movefile['url'] );
+            
+            // Set featured image
+            $attachment_id = wp_insert_attachment([
+                'post_mime_type' => $movefile['type'],
+                'post_title'     => sanitize_file_name( $movefile['file'] ),
+                'post_status'    => 'inherit',
+            ], $movefile['file'], $story_id );
+            
+            require_once ABSPATH . 'wp-admin/includes/image.php';
+            wp_update_attachment_metadata( $attachment_id, wp_generate_attachment_metadata( $attachment_id, $movefile['file'] ) );
+            set_post_thumbnail( $story_id, $attachment_id );
+            
+            wp_send_json_success( 'Story uploaded successfully!' );
+        }
+    }
+    
+    wp_send_json_error( 'Failed to upload story.' );
+}
+add_action( 'wp_ajax_gtg_upload_vendor_story', 'gtg_upload_vendor_story' );
+
+// AJAX: Get stories for current user location
+function gtg_get_location_stories() {
+    $user_city = sanitize_text_field( $_POST['user_city'] ?? '' );
+    
+    if ( empty( $user_city ) ) {
+        wp_send_json_error( 'City not provided.' );
+    }
+    
+    // Get active stories for this city
+    $stories = get_posts([
+        'post_type'      => 'vendor_story',
+        'post_status'    => 'publish',
+        'posts_per_page' => 20,
+        'meta_query'     => [
+            [
+                'key'     => '_story_city',
+                'value'   => $user_city,
+                'compare' => '='
+            ],
+            [
+                'key'     => '_story_expiry',
+                'value'   => current_time( 'mysql' ),
+                'compare' => '>'
+            ]
+        ],
+        'orderby' => 'date',
+        'order'   => 'DESC'
+    ]);
+    
+    $story_data = [];
+    foreach ( $stories as $story ) {
+        $vendor_id = get_post_meta( $story->ID, '_story_vendor_id', true );
+        $vendor_name = get_user_meta( $vendor_id, 'gtg_shop_name', true );
+        $media_url = get_post_meta( $story->ID, '_story_media_url', true );
+        $expiry = get_post_meta( $story->ID, '_story_expiry', true );
+        
+        $story_data[] = [
+            'id'          => $story->ID,
+            'vendor_name' => $vendor_name,
+            'vendor_id'   => $vendor_id,
+            'caption'     => $story->post_content,
+            'media_url'   => $media_url,
+            'expiry'      => $expiry,
+            'time_ago'    => human_time_diff( strtotime( $story->post_date ), current_time( 'timestamp' ) ) . ' ago'
+        ];
+    }
+    
+    wp_send_json_success( $story_data );
+}
+add_action( 'wp_ajax_gtg_get_location_stories', 'gtg_get_location_stories' );
+add_action( 'wp_ajax_nopriv_gtg_get_location_stories', 'gtg_get_location_stories' );
+
+// Shortcode: Display stories carousel
+function grabtogo_stories_carousel_shortcode( $atts ) {
+    $atts = shortcode_atts([
+        'city' => '',
+        'limit' => 10
+    ], $atts );
+    
+    ob_start();
+    ?>
+    <div class="gtg-stories-carousel" data-city="<?php echo esc_attr( $atts['city'] ); ?>">
+        <h3 class="stories-title">Stories Near You</h3>
+        <div class="stories-container" id="stories-container">
+            <div class="story-loading">Loading stories...</div>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+add_shortcode( 'grabtogo_stories_carousel', 'grabtogo_stories_carousel_shortcode' );
+
+// Add Dokan dashboard story management page
+function grabtogo_add_story_dashboard_menu( $urls ) {
+    $urls['post-story'] = [
+        'title' => 'Post Story',
+        'icon'  => '<i class="fas fa-camera"></i>',
+        'url'   => dokan_get_navigation_url( 'post-story' ),
+        'pos'   => 155
+    ];
+    return $urls;
+}
+add_filter( 'dokan_get_dashboard_nav', 'grabtogo_add_story_dashboard_menu' );
+
+// Handle story dashboard template
+function grabtogo_story_dashboard_template( $query_vars ) {
+    if ( isset( $query_vars['post-story'] ) ) {
+        get_header( 'dashboard' );
+        ?>
+        <div class="dashboard-content-container" data-simplebar>
+            <div class="dashboard-content-inner">
+                <h3><i class="fas fa-camera"></i> Post Your Story</h3>
+                <p>Share what's happening at your store with customers in your city!</p>
+                
+                <form id="gtg-story-form" class="gtg-story-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="story_media">Upload Image/Video*</label>
+                        <input type="file" id="story_media" name="story_media" accept="image/*,video/*" required>
+                        <small>Max file size: 10MB. Supported: JPG, PNG, MP4</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="story_caption">Caption</label>
+                        <textarea id="story_caption" name="caption" rows="3" placeholder="Tell customers about your offer or what's new..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="expiry_hours">Story Duration</label>
+                        <select id="expiry_hours" name="expiry_hours">
+                            <option value="24">24 Hours</option>
+                            <option value="48">48 Hours</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Post Story
+                    </button>
+                </form>
+                
+                <hr>
+                
+                <h4>Your Recent Stories</h4>
+                <div id="vendor-stories-list">
+                    Loading your stories...
+                </div>
+                
+            </div>
+        </div>
+        <?php
+        get_footer( 'dashboard' );
+        return;
+    }
+}
+add_action( 'dokan_load_custom_template', 'grabtogo_story_dashboard_template' );
+
+// Clean up expired stories (run daily)
+function grabtogo_cleanup_expired_stories() {
+    $expired_stories = get_posts([
+        'post_type'      => 'vendor_story',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'meta_query'     => [
+            [
+                'key'     => '_story_expiry',
+                'value'   => current_time( 'mysql' ),
+                'compare' => '<'
+            ]
+        ]
+    ]);
+    
+    foreach ( $expired_stories as $story ) {
+        wp_update_post([
+            'ID'          => $story->ID,
+            'post_status' => 'expired'
+        ]);
+    }
+}
+add_action( 'grabtogo_daily_cleanup', 'grabtogo_cleanup_expired_stories' );
+
+// Schedule daily cleanup if not already scheduled
+if ( ! wp_next_scheduled( 'grabtogo_daily_cleanup' ) ) {
+    wp_schedule_event( time(), 'daily', 'grabtogo_daily_cleanup' );
+}
+
+// ============ END VENDOR STORIES FEATURE ============
+
+// ============ ADDITIONAL MOBILE UX HELPERS ============
+
+// Shortcode: Category navigation bar
+function grabtogo_category_bar_shortcode( $atts ) {
+    $atts = shortcode_atts([
+        'sticky' => 'true'
+    ], $atts );
+    
+    $categories = get_terms([
+        'taxonomy' => 'listing_category',
+        'hide_empty' => true,
+        'number' => 10
+    ]);
+    
+    if ( empty( $categories ) || is_wp_error( $categories ) ) {
+        return '';
+    }
+    
+    $sticky_class = $atts['sticky'] === 'true' ? 'sticky' : '';
+    
+    ob_start();
+    ?>
+    <div class="gtg-category-bar <?php echo esc_attr( $sticky_class ); ?>">
+        <a href="<?php echo home_url( '/listings/' ); ?>" class="category-item">All</a>
+        <?php foreach ( $categories as $category ) : ?>
+            <a href="<?php echo get_term_link( $category ); ?>" class="category-item">
+                <?php echo esc_html( $category->name ); ?>
+            </a>
+        <?php endforeach; ?>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+add_shortcode( 'grabtogo_category_bar', 'grabtogo_category_bar_shortcode' );
+
+// AJAX: Get vendor stories for dashboard
+function gtg_get_vendor_stories() {
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( 'Please log in.' );
+    }
+    
+    $user_id = get_current_user_id();
+    $stories = get_posts([
+        'post_type'      => 'vendor_story',
+        'author'         => $user_id,
+        'post_status'    => ['publish', 'expired'],
+        'posts_per_page' => 10,
+        'orderby'        => 'date',
+        'order'          => 'DESC'
+    ]);
+    
+    $story_data = [];
+    foreach ( $stories as $story ) {
+        $expiry = get_post_meta( $story->ID, '_story_expiry', true );
+        $media_url = get_post_meta( $story->ID, '_story_media_url', true );
+        $is_active = strtotime( $expiry ) > current_time( 'timestamp' );
+        
+        $story_data[] = [
+            'id'        => $story->ID,
+            'title'     => $story->post_title,
+            'caption'   => $story->post_content,
+            'media_url' => $media_url,
+            'expiry'    => $expiry,
+            'status'    => $is_active ? 'active' : 'expired',
+            'created'   => human_time_diff( strtotime( $story->post_date ), current_time( 'timestamp' ) ) . ' ago'
+        ];
+    }
+    
+    wp_send_json_success( $story_data );
+}
+add_action( 'wp_ajax_gtg_get_vendor_stories', 'gtg_get_vendor_stories' );
+
+// Mobile app detection
+function grabtogo_is_mobile() {
+    return wp_is_mobile() || isset( $_SERVER['HTTP_X_REQUESTED_WITH'] );
+}
+
+// Add mobile viewport meta tag
+function grabtogo_add_mobile_viewport() {
+    echo '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">';
+    echo '<meta name="mobile-web-app-capable" content="yes">';
+    echo '<meta name="apple-mobile-web-app-capable" content="yes">';
+    echo '<meta name="apple-mobile-web-app-status-bar-style" content="default">';
+    echo '<meta name="theme-color" content="#ff6f00">';
+}
+add_action( 'wp_head', 'grabtogo_add_mobile_viewport' );
+
+// Add PWA manifest (for app-like experience)
+function grabtogo_add_pwa_manifest() {
+    ?>
+    <link rel="manifest" href="<?php echo get_stylesheet_directory_uri(); ?>/manifest.json">
+    <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('<?php echo get_stylesheet_directory_uri(); ?>/sw.js')
+                .then(function(registration) {
+                    console.log('SW registered: ', registration);
+                }).catch(function(registrationError) {
+                    console.log('SW registration failed: ', registrationError);
+                });
+            });
+        }
+    </script>
+    <?php
+}
+add_action( 'wp_head', 'grabtogo_add_pwa_manifest' );
+
+// Enhanced listing display for mobile
+function grabtogo_mobile_listing_card( $listing_id ) {
+    $listing = get_post( $listing_id );
+    if ( ! $listing ) return '';
+    
+    $featured_image = get_the_post_thumbnail_url( $listing_id, 'medium' );
+    $price = get_post_meta( $listing_id, '_regular_price', true );
+    $sale_price = get_post_meta( $listing_id, '_sale_price', true );
+    $vendor_id = $listing->post_author;
+    $vendor_name = get_user_meta( $vendor_id, 'gtg_shop_name', true );
+    $city = get_post_meta( $listing_id, '_job_location', true );
+    
+    ob_start();
+    ?>
+    <div class="gtg-mobile-listing-card" data-listing-id="<?php echo $listing_id; ?>">
+        <?php if ( $featured_image ) : ?>
+            <div class="listing-image">
+                <img src="<?php echo esc_url( $featured_image ); ?>" alt="<?php echo esc_attr( $listing->post_title ); ?>">
+                <?php if ( $sale_price ) : ?>
+                    <span class="sale-badge">SALE</span>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        
+        <div class="listing-content">
+            <h3 class="listing-title"><?php echo esc_html( $listing->post_title ); ?></h3>
+            <div class="listing-meta">
+                <span class="vendor-name"><?php echo esc_html( $vendor_name ); ?></span>
+                <span class="listing-location"><?php echo esc_html( $city ); ?></span>
+            </div>
+            
+            <?php if ( $price ) : ?>
+                <div class="listing-price">
+                    <?php if ( $sale_price ) : ?>
+                        <span class="original-price">₹<?php echo number_format( $price ); ?></span>
+                        <span class="sale-price">₹<?php echo number_format( $sale_price ); ?></span>
+                    <?php else : ?>
+                        <span class="current-price">₹<?php echo number_format( $price ); ?></span>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            
+            <a href="<?php echo get_permalink( $listing_id ); ?>" class="view-offer-btn">
+                View Offer
+            </a>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+// Force mobile redirect for specific pages
+function grabtogo_force_mobile_redirect() {
+    if ( grabtogo_is_mobile() && ! is_admin() ) {
+        // Add any specific mobile redirects here
+        if ( is_page( 'dashboard' ) && ! strpos( $_SERVER['REQUEST_URI'], '/my-profile/' ) ) {
+            wp_redirect( home_url( '/my-profile/' ) );
+            exit;
+        }
+    }
+}
+add_action( 'template_redirect', 'grabtogo_force_mobile_redirect' );
+
+// Add connection status indicator
+function grabtogo_add_connection_status() {
+    if ( grabtogo_is_mobile() ) {
+        echo '<div class="gtg-connection-status" id="connection-status"></div>';
+    }
+}
+add_action( 'wp_footer', 'grabtogo_add_connection_status' );
+
+// Optimize images for mobile
+function grabtogo_mobile_image_sizes( $sizes ) {
+    if ( grabtogo_is_mobile() ) {
+        $sizes['mobile-thumb'] = [
+            'width'  => 400,
+            'height' => 300,
+            'crop'   => true
+        ];
+        $sizes['mobile-large'] = [
+            'width'  => 800,
+            'height' => 600,
+            'crop'   => true
+        ];
+    }
+    return $sizes;
+}
+add_filter( 'intermediate_image_sizes_advanced', 'grabtogo_mobile_image_sizes' );
+
+// ============ END MOBILE UX HELPERS ============
