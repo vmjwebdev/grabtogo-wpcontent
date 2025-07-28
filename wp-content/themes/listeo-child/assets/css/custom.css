@@ -1,0 +1,313 @@
+
+/* Refined Product Grid for Laptop View */
+@media (min-width: 1025px) {
+  ul.products.columns-4 {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    padding: 0;
+    margin: 0 auto;
+    justify-content: start;
+    align-items: start;
+  }
+
+  ul.products li.product {
+    background: #f8f8f8;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  ul.products li.product:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+  }
+
+  ul.products li.product .woocommerce-loop-product__title,
+  ul.products li.product .price {
+    padding: 8px 12px;
+    font-size: 14px;
+    background: #f8f8f8;
+  }
+
+  ul.products li.product .woocommerce-loop-product__title {
+    min-height: 45px;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  ul.products li.product img {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  ul.products li.product .onsale {
+    font-size: 11px !important;
+    padding: 2px 6px !important;
+    top: 10px !important;
+    left: 10px !important;
+    right: auto !important;
+    background: #ff3f3f !important;
+    border-radius: 4px !important;
+    line-height: normal !important;
+  }
+
+  /* âœ… "View Offer" button hover color */
+  ul.products li.product a.button:hover {
+    background-color: #db4a2b !important;
+    color: #fff !important;
+  }
+}
+
+/* Hide breadcrumbs site-wide */
+.breadcrumbs,
+.page-title-wrapper .breadcrumbs,
+nav#breadcrumbs,
+nav.breadcrumbs,
+div#breadcrumbs,
+div.breadcrumbs {
+  display: none !important;
+}
+
+/* âœ… Hide vendor info box from top of single product page */
+.single-product .profile-info-box {
+  display: none;
+}
+
+/* âœ… Show vendor box relocated at bottom */
+.single-product .profile-info-box.relocated {
+  display: block !important;
+  margin-top: 30px;
+  padding: 15px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+
+/*  vendor Form style  */
+#gtg-reg-form {
+    background-color: #ffffff;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+    max-width: 500px;
+    margin: 40px auto;
+    font-family: 'Roboto', sans-serif;
+    border: 1px solid #e0e0e0;
+}
+
+/* Headline */
+#gtg-reg-form h3 {
+    margin-bottom: 20px;
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    color: #333;
+}
+
+/* Label styling */
+#gtg-reg-form label {
+    display: block;
+    margin-top: 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #444;
+}
+
+/* Input fields */
+#gtg-reg-form input[type="text"],
+#gtg-reg-form input[type="email"],
+#gtg-reg-form input[type="password"],
+#gtg-reg-form input[type="file"] {
+    width: 100%;
+    padding: 10px 12px;
+    margin-top: 6px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+}
+
+#gtg-reg-form input:focus {
+    border-color: #ff6f00;
+    outline: none;
+}
+
+/* OTP section and status */
+#otp_section {
+    margin-top: 10px;
+}
+
+#otp_status {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+/* Buttons */
+#gtg-reg-form button[type="button"],
+#gtg-reg-form button[type="submit"] {
+    margin-top: 18px;
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    background-color: #ff6f00;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#gtg-reg-form button[type="button"]:hover,
+#gtg-reg-form button[type="submit"]:hover {
+    background-color: #e65c00;
+}
+
+#gtg-reg-form button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Responsive tweaks */
+@media screen and (max-width: 480px) {
+    #gtg-reg-form {
+        padding: 20px;
+    }
+
+    #gtg-reg-form h3 {
+        font-size: 20px;
+    }
+}
+/*  vendor Form style end  */
+
+/* Remove ugly breadcrumb/titlebar */
+#titlebar.solid {
+    display: none !important;
+}
+
+/* Optional spacing after header for app layout */
+body.page,
+body.single,
+body.archive {
+    margin-top: 20px; /* Adjust as needed */
+}
+
+/* Allow the select’s native dropdown to show outside the form card */
+.gtg-registration-form {
+  overflow: visible !important;
+}
+
+/* Tidy up the select itself */
+.gtg-registration-form .input-text {
+  width: 100%;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+/* 1) Allow the dropdown to spill outside the form card */
+.gtg-registration-form {
+  overflow: visible !important;
+}
+
+/* 2) Make the <select> text and arrow visible */
+.gtg-registration-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  color: #333 !important;           /* dark text */
+  background: #fff !important;      /* white background */
+  padding-right: 2.5em;             /* room for arrow */
+}
+
+/* 3) Add a native arrow (if you like) */
+.gtg-registration-form select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path fill='%23666' d='M0 0l5 6 5-6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.75em center;
+  background-size: 0.65em;
+}
+
+/* 1) Make the form use full width up to its max-width */
+.gtg-registration-form {
+  width: 100% !important;
+  max-width: 500px;
+  margin: auto;
+}
+
+/* 2) Ensure inputs, selects and button span 100% */
+.gtg-registration-form input,
+.gtg-registration-form select,
+.gtg-registration-form button {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* 3) Tweak padding & font-sizes on small screens */
+@media (max-width: 600px) {
+  .gtg-registration-form {
+    padding: 20px !important;
+  }
+  .gtg-registration-form label {
+    font-size: 0.95rem;
+  }
+  .gtg-registration-form input,
+  .gtg-registration-form select {
+    padding: 12px !important;
+    font-size: 1rem;
+  }
+  .gtg-registration-form button {
+    padding: 12px !important;
+    font-size: 1rem;
+  }
+}
+
+/* make container relative so icon can sit on top */
+.gtg-registration-form .gtg-password-container {
+  position: relative;
+  width: 100%;
+}
+
+/* give the input room on the right for the eye */
+.gtg-registration-form .gtg-password-container input[type="password"] {
+  width: 100%;
+  padding-right: 2.5em;  /* adjust if your icon is wider */
+  box-sizing: border-box;
+}
+
+/* position the eye inside the input */
+.gtg-registration-form .gtg-password-container .gtg-toggle-password {
+  position: absolute;
+  top: 50%;
+  right: 0.75em;         /* same as padding-right/2 */
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #666;
+  font-size: 1.1em;      /* tweak to match your design */
+}
+.gtg-registration-form .gtg-password-container .gtg-toggle-password:hover {
+  color: #333;
+}
+
+/* Hide any extra eye icons *outside* your gtg-password-container */
+.gtg-registration-form i.fa-eye:not(.gtg-toggle-password) {
+  display: none !important;
+}

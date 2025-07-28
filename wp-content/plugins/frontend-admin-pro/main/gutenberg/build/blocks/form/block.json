@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 2,
+  "name": "frontend-admin/form",
+  "title": "Frontend Form",
+  "description": "Displays a form that allows users to edit and add content from the frontend.",
+  "category": "frontend-admin",
+  "textdomain": "frontend-admin",
+  "supports": {
+    "align": [
+      "wide"
+    ]
+  },
+  "attributes": {
+    "label": {
+      "type": "string",
+      "default": "Frontend Form"
+    },
+    "custom_fields_save": {
+      "type": "string",
+      "default": "Post"
+    }
+  },
+  "editorScript": "file:../../form/index.js"
+}

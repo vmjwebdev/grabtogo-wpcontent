@@ -1,0 +1,23 @@
+.paid .hide-if-payed{
+    display: none;
+}
+.frontend-admin-payment:not(.paid) .show-if-payed{
+    display: none;
+}
+
+.card-wrapper{
+    width: 100%
+}
+
+.fea-cc-fields{
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 540px){
+    .fea-cc-fields > .acf-label {
+         flex-basis: 45%!important;
+     }
+ 
+ }
