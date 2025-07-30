@@ -12,3 +12,305 @@ Domain Path: /languages/
 Tags: light, responsive-layout, post-formats, theme-options, translation-ready, two-columns
 Template:  listeo
 */
+
+/* ========================================
+   MOBILE KAUFDA-STYLE LISTING LAYOUT
+   ======================================== */
+
+/* Mobile Grid: 2 listings per row with flyer-like layout */
+@media (max-width: 768px) {
+    
+    /* Force flexbox layout for perfect alignment */
+    #listeo-listings-container .row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 15px;
+        margin: 0 -7.5px;
+    }
+    
+    /* Mobile grid: 2 columns per row */
+    #listeo-listings-container .row .col-md-6,
+    #listeo-listings-container .row .col-lg-6,
+    #listeo-listings-container .row .col-lg-4,
+    #listeo-listings-container .row .col-md-12 {
+        flex: 0 0 calc(50% - 15px) !important;
+        max-width: calc(50% - 15px) !important;
+        width: calc(50% - 15px) !important;
+        padding: 0 7.5px !important;
+        margin-bottom: 20px !important;
+    }
+    
+    /* Container adjustments for mobile flyer layout */
+    .listing-item-container {
+        height: auto !important;
+        background-color: #fff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1) !important;
+        margin-bottom: 0 !important;
+        overflow: hidden !important;
+        transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+    }
+    
+    .listing-item-container:hover {
+        transform: translateY(-4px) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    /* Main listing item - 9:16 flyer proportions */
+    .listing-item {
+        height: 240px !important; /* Optimized for mobile flyer ratio */
+        width: 100% !important;
+        border-radius: 12px 12px 0 0 !important;
+        position: relative !important;
+        overflow: hidden !important;
+        background: #f5f5f5 !important;
+    }
+    
+    /* Image styling with object-fit: contain */
+    .listing-item img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important; /* Maintain original resolution */
+        border-radius: 12px 12px 0 0 !important;
+        background-color: #f8f9fa !important; /* Background for letterboxing */
+    }
+    
+    /* Remove overlay gradient on mobile for cleaner look */
+    .listing-item:before {
+        display: none !important;
+    }
+    
+    /* Content positioned below image */
+    .listing-item-content {
+        position: static !important;
+        bottom: auto !important;
+        left: auto !important;
+        padding: 15px !important;
+        background: #fff !important;
+        width: 100% !important;
+        z-index: auto !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Clean text styling */
+    .listing-item-content h3 {
+        color: #2c3e50 !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        margin: 0 0 8px 0 !important;
+        line-height: 1.4 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+    
+    .listing-item-content span {
+        color: #7f8c8d !important;
+        font-size: 14px !important;
+        font-weight: 400 !important;
+        line-height: 1.3 !important;
+        margin-top: 0 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 1 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+    
+    /* Category tag styling */
+    .listing-item-content span.tag {
+        background: #e8f4fd !important;
+        color: #3498db !important;
+        border-radius: 20px !important;
+        padding: 4px 12px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        margin-bottom: 8px !important;
+        display: inline-block !important;
+        line-height: 1.2 !important;
+        border: 1px solid #d6eaf8 !important;
+    }
+    
+    /* Badges as vertical stacked pills at top-left */
+    .listing-small-badges-container {
+        position: absolute !important;
+        top: 12px !important;
+        left: 12px !important;
+        z-index: 200 !important;
+        padding-right: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        max-width: calc(100% - 60px) !important;
+    }
+    
+    .listing-small-badges-container .listing-small-badge {
+        background: rgba(44, 62, 80, 0.9) !important;
+        color: #fff !important;
+        border-radius: 20px !important;
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        white-space: nowrap !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    }
+    
+    .listing-small-badges-container .featured-badge {
+        background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    }
+    
+    .listing-small-badges-container .instant-badge {
+        background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    }
+    
+    .listing-small-badges-container .pricing-badge {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    }
+    
+    /* Like icon at bottom-right with orange accent */
+    span.like-icon {
+        position: absolute !important;
+        bottom: 12px !important;
+        right: 12px !important;
+        width: 40px !important;
+        height: 40px !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        color: #e67e22 !important; /* Orange accent color */
+        border-radius: 50% !important;
+        border: 2px solid #f39c12 !important;
+        box-shadow: 0 2px 12px rgba(230, 126, 34, 0.3) !important;
+        backdrop-filter: blur(10px) !important;
+        z-index: 200 !important;
+        transition: all 0.3s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    span.like-icon:before,
+    span.like-icon:after {
+        top: 50% !important;
+        transform: translateY(-50%) scale(0.9) !important;
+        color: #e67e22 !important;
+        font-size: 16px !important;
+    }
+    
+    span.like-icon:hover,
+    span.like-icon.liked {
+        background: #e67e22 !important;
+        color: #fff !important;
+        border-color: #d35400 !important;
+        box-shadow: 0 4px 16px rgba(230, 126, 34, 0.4) !important;
+        transform: scale(1.1) !important;
+    }
+    
+    span.like-icon:hover:before,
+    span.like-icon:hover:after,
+    span.like-icon.liked:before,
+    span.like-icon.liked:after {
+        color: #fff !important;
+    }
+    
+    /* Rating adjustments for mobile */
+    .star-rating,
+    .numerical-rating {
+        position: absolute !important;
+        bottom: 12px !important;
+        left: 12px !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border-radius: 20px !important;
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+        backdrop-filter: blur(10px) !important;
+        z-index: 190 !important;
+    }
+    
+    .rating-counter {
+        color: #7f8c8d !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Ensure proper spacing and alignment */
+    .listing-item-container a {
+        text-decoration: none !important;
+        display: block !important;
+        height: 100% !important;
+    }
+    
+    /* Status badges (Now Open/Closed) */
+    .listing-badge {
+        position: absolute !important;
+        top: 12px !important;
+        right: 12px !important;
+        background: rgba(44, 62, 80, 0.9) !important;
+        color: #fff !important;
+        border-radius: 20px !important;
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        backdrop-filter: blur(10px) !important;
+        z-index: 180 !important;
+    }
+    
+    .listing-badge.now-open {
+        background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    }
+    
+    .listing-badge.now-closed {
+        background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+    }
+    
+    /* Ensure badges don't overlap with like icon */
+    .listing-item-container:has(.like-icon) .listing-badge {
+        right: 60px !important;
+    }
+    
+    /* Fix for containers with multiple layout classes */
+    .listing-item-container.list-layout {
+        height: auto !important;
+    }
+    
+    .listing-item-container.list-layout .listing-item {
+        height: 240px !important;
+    }
+    
+    .listing-item-container.list-layout .listing-item-content {
+        position: static !important;
+        padding: 15px !important;
+        background: #fff !important;
+    }
+    
+    .listing-item-container.list-layout span.like-icon {
+        position: absolute !important;
+        bottom: 12px !important;
+        right: 12px !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    /* Prevent text content from overlapping with ratings */
+    .listing-item-content:has(~ .star-rating),
+    .listing-item-content:has(~ .numerical-rating) {
+        padding-bottom: 50px !important;
+    }
+}
+
+/* Extra small devices - single column on very small screens */
+@media (max-width: 480px) {
+    #listeo-listings-container .row .col-md-6,
+    #listeo-listings-container .row .col-lg-6,
+    #listeo-listings-container .row .col-lg-4,
+    #listeo-listings-container .row .col-md-12 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
