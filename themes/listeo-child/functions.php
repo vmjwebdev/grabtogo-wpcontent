@@ -422,3 +422,357 @@ function gtg_send_to_zoho_flow( $user_id, $new_role, $old_roles ) {
         ]
     );
 }
+
+// ============ KERALA LISTINGS GRID SHORTCODE ============
+// Add this to your existing functions.php (don't duplicate the opening PHP tag)
+
+// ============ Kerala Listings Grid Shortcode ============
+function kerala_listings_grid_shortcode($atts) {
+    $atts = shortcode_atts([
+        'columns' => '2',
+        'posts_per_page' => '12',
+        'location_filter' => 'true',
+        'category_filter' => 'true',
+        'price_filter' => 'true',
+        'style' => 'kaufda',
+        'districts' => 'Ernakulam,Thrissur,Kottayam'
+    ], $atts, 'kerala_listings_grid');
+
+    ob_start();
+    ?>
+    <div id="kerala-listings-container" class="kerala-listings-wrapper">
+        
+        <!-- Filters Section -->
+        <?php if ($atts['location_filter'] == 'true' || $atts['category_filter'] == 'true') : ?>
+        <div class="kerala-filters-section">
+            <div class="filters-row">
+                
+                <?php if ($atts['location_filter'] == 'true') : ?>
+                <div class="filter-group location-filter">
+                    <select name="kerala_district" id="kerala_district">
+                        <option value=""><?php esc_html_e('All Kerala', 'grabtogo'); ?></option>
+                        <?php 
+                        $districts = explode(',', $atts['districts']);
+                        foreach ($districts as $district) : ?>
+                            <option value="<?php echo esc_attr(trim($district)); ?>">
+                                <?php echo esc_html(trim($district)); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="filter-group gps-filter">
+                    <button type="button" id="kerala_near_me" class="near-me-btn">
+                        <i class="fa fa-location-arrow"></i>
+                        <?php esc_html_e('Near Me', 'grabtogo'); ?>
+                    </button>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($atts['category_filter'] == 'true') : ?>
+                <div class="filter-group category-filter">
+                    <select name="kerala_category" id="kerala_category">
+                        <option value=""><?php esc_html_e('All Categories', 'grabtogo'); ?></option>
+                        <?php 
+                        $categories = get_terms([
+                            'taxonomy' => 'listing_category',
+                            'hide_empty' => true
+                        ]);
+                        foreach ($categories as $cat) : ?>
+                            <option value="<?php echo esc_attr($cat->slug); ?>">
+                                <?php echo esc_html($cat->name); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($atts['price_filter'] == 'true') : ?>
+                <div class="filter-group price-filter">
+                    <select name="kerala_price_range" id="kerala_price_range">
+                        <option value=""><?php esc_html_e('Any Price', 'grabtogo'); ?></option>
+                        <option value="0-500">₹0 - ₹500</option>
+                        <option value="500-1000">₹500 - ₹1,000</option>
+                        <option value="1000-2000">₹1,000 - ₹2,000</option>
+                        <option value="2000+">₹2,000+</option>
+                    </select>
+                </div>
+                <?php endif; ?>
+
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Loading State -->
+        <div id="kerala-loading" style="display:none;">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p><?php esc_html_e('Finding best deals...', 'grabtogo'); ?></p>
+            </div>
+        </div>
+
+        <!-- Results Grid -->
+        <div id="kerala-listings-grid" class="kerala-grid" data-columns="<?php echo esc_attr($atts['columns']); ?>">
+            <?php echo kerala_get_listings_html($atts); ?>
+        </div>
+
+        <!-- Load More Button -->
+        <div class="kerala-load-more-container">
+            <button type="button" id="kerala_load_more" class="load-more-btn" data-page="1" data-max-pages="1">
+                <?php esc_html_e('Load More Deals', 'grabtogo'); ?>
+            </button>
+        </div>
+
+    </div>
+    <?php
+    return ob_get_clean();
+}
+add_shortcode('kerala_listings_grid', 'kerala_listings_grid_shortcode');
+
+// ============ Get Listings HTML Function ============
+function kerala_get_listings_html($atts = [], $filters = []) {
+    $args = [
+        'post_type' => 'listing',
+        'post_status' => 'publish',
+        'posts_per_page' => intval($atts['posts_per_page'] ?? 12),
+        'paged' => intval($filters['page'] ?? 1),
+        'meta_query' => [
+            'relation' => 'AND'
+        ]
+    ];
+
+    // Location filtering
+    if (!empty($filters['district'])) {
+        $args['meta_query'][] = [
+            'relation' => 'OR',
+            [
+                'key' => '_friendly_address',
+                'value' => $filters['district'],
+                'compare' => 'LIKE'
+            ],
+            [
+                'key' => '_address',
+                'value' => $filters['district'],
+                'compare' => 'LIKE'
+            ]
+        ];
+    }
+
+    // Category filtering
+    if (!empty($filters['category'])) {
+        $args['tax_query'] = [
+            [
+                'taxonomy' => 'listing_category',
+                'field' => 'slug',
+                'terms' => $filters['category']
+            ]
+        ];
+    }
+
+    // Price filtering
+    if (!empty($filters['price_range'])) {
+        if ($filters['price_range'] === '2000+') {
+            $args['meta_query'][] = [
+                'key' => '_price_min',
+                'value' => 2000,
+                'type' => 'NUMERIC',
+                'compare' => '>='
+            ];
+        } else {
+            $range = explode('-', $filters['price_range']);
+            if (count($range) === 2) {
+                $args['meta_query'][] = [
+                    'relation' => 'AND',
+                    [
+                        'key' => '_price_min',
+                        'value' => intval($range[0]),
+                        'type' => 'NUMERIC',
+                        'compare' => '>='
+                    ],
+                    [
+                        'key' => '_price_max',
+                        'value' => intval($range[1]),
+                        'type' => 'NUMERIC',
+                        'compare' => '<='
+                    ]
+                ];
+            }
+        }
+    }
+
+    // GPS proximity sorting
+    if (!empty($filters['user_lat']) && !empty($filters['user_lng'])) {
+        $args['meta_query'][] = [
+            'relation' => 'AND',
+            [
+                'key' => '_geolocation_lat',
+                'compare' => 'EXISTS'
+            ],
+            [
+                'key' => '_geolocation_long',
+                'compare' => 'EXISTS'
+            ]
+        ];
+        // Add custom orderby for distance (simplified)
+        $args['orderby'] = 'meta_value_num';
+        $args['meta_key'] = '_geolocation_lat';
+    }
+
+    $query = new WP_Query($args);
+    
+    ob_start();
+    
+    if ($query->have_posts()) :
+        while ($query->have_posts()) : $query->the_post();
+            kerala_render_listing_card(get_post());
+        endwhile;
+        wp_reset_postdata();
+    else :
+        ?>
+        <div class="no-listings-found">
+            <div class="no-results-content">
+                <i class="fa fa-search"></i>
+                <h3><?php esc_html_e('No businesses found', 'grabtogo'); ?></h3>
+                <p><?php esc_html_e('Try adjusting your filters or explore all Kerala', 'grabtogo'); ?></p>
+            </div>
+        </div>
+        <?php
+    endif;
+
+    return ob_get_clean();
+}
+
+// ============ Render Individual Listing Card ============
+function kerala_render_listing_card($post) {
+    $post_id = $post->ID;
+    
+   // Prefer the listing Featured Image (Listeo widget uses this)
+$featured_image = '';
+if (has_post_thumbnail($post_id)) {
+    // same size Listeo uses in the widget
+    $featured_image = get_the_post_thumbnail_url($post_id, 'full');
+    if (!$featured_image) { // fallback size if grid size not registered
+        $featured_image = get_the_post_thumbnail_url($post_id, 'large');
+    }
+}
+
+// If no featured image, pull first item from _gallery
+if (empty($featured_image)) {
+    $gallery = get_post_meta($post_id, '_gallery', true);
+    if ($gallery) {
+        $gallery_array = maybe_unserialize($gallery);
+        if (is_array($gallery_array) && !empty($gallery_array)) {
+            $first = reset($gallery_array);
+            if (is_numeric($first)) {
+                // gallery sometimes stores attachment IDs
+                $featured_image = wp_get_attachment_image_url((int)$first, 'full');
+                if (!$featured_image) {
+                    $featured_image = wp_get_attachment_image_url((int)$first, 'large');
+                }
+            } elseif (is_string($first)) {
+                // gallery stores full URL; force https to avoid mixed-content blanks
+                $featured_image = preg_replace('#^http://#', 'https://', $first);
+            }
+        }
+    }
+}
+
+    
+    // Default placeholder
+    if (empty($featured_image)) {
+        $featured_image = get_template_directory_uri() . '/images/placeholder-listing.jpg';
+    }
+
+    // Get location
+    $location = get_post_meta($post_id, '_friendly_address', true);
+    if (empty($location)) {
+        $location = get_post_meta($post_id, '_address', true);
+    }
+
+    // Get rating
+    $rating = get_post_meta($post_id, 'listeo-avg-rating', true);
+    $rating_display = ($rating && $rating > 0) ? number_format($rating, 1) : 'New';
+
+    // Get price range
+    $price_min = get_post_meta($post_id, '_price_min', true);
+    $price_max = get_post_meta($post_id, '_price_max', true);
+    $price_display = '';
+    if ($price_min && $price_max) {
+        $price_display = "₹{$price_min} - ₹{$price_max}";
+    } elseif ($price_min) {
+        $price_display = "From ₹{$price_min}";
+    }
+
+    ?>
+    <div class="kerala-listing-card" data-id="<?php echo esc_attr($post_id); ?>">
+        <a href="<?php echo esc_url(get_permalink($post_id)); ?>" class="card-link">
+            
+            <!-- Card Image -->
+            <div class="card-image-container">
+                <img src="<?php echo esc_url($featured_image); ?>" 
+                     alt="<?php echo esc_attr(get_the_title()); ?>" 
+                     class="card-image"
+                     loading="lazy">
+                
+                <!-- Rating Badge -->
+                <div class="rating-badge">
+                    <?php if ($rating && $rating > 0) : ?>
+                        <i class="fa fa-star"></i>
+                        <span><?php echo esc_html($rating_display); ?></span>
+                    <?php else : ?>
+                        <span class="new-badge"><?php esc_html_e('New', 'grabtogo'); ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Card Content -->
+            <div class="card-content">
+                <h3 class="business-name"><?php echo esc_html(get_the_title()); ?></h3>
+                
+                <?php if ($location) : ?>
+                <div class="business-location">
+                    <i class="fa fa-map-marker"></i>
+                    <span><?php echo esc_html($location); ?></span>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($price_display) : ?>
+                <div class="business-price">
+                    <span class="price-text"><?php echo esc_html($price_display); ?></span>
+                </div>
+                <?php endif; ?>
+                
+            </div>
+
+        </a>
+    </div>
+    <?php
+}
+
+// ============ AJAX Handler for Filtering ============
+function kerala_listings_ajax_filter() {
+    check_ajax_referer('kerala_listings_nonce', 'nonce');
+    
+    $filters = [
+        'district' => sanitize_text_field($_POST['district'] ?? ''),
+        'category' => sanitize_text_field($_POST['category'] ?? ''),
+        'price_range' => sanitize_text_field($_POST['price_range'] ?? ''),
+        'user_lat' => floatval($_POST['user_lat'] ?? 0),
+        'user_lng' => floatval($_POST['user_lng'] ?? 0),
+        'page' => intval($_POST['page'] ?? 1)
+    ];
+    
+    $atts = [
+        'posts_per_page' => 12,
+        'columns' => 2
+    ];
+    
+    $html = kerala_get_listings_html($atts, $filters);
+    
+    wp_send_json_success([
+        'html' => $html,
+        'found_posts' => $GLOBALS['wp_query']->found_posts ?? 0
+    ]);
+}
+add_action('wp_ajax_kerala_listings_filter', 'kerala_listings_ajax_filter');
+add_action('wp_ajax_nopriv_kerala_listings_filter', 'kerala_listings_ajax_filter');
