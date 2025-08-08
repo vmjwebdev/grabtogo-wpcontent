@@ -1,4 +1,8 @@
 jQuery(function($) {
+
+    /* ===========================
+       OTP REGISTRATION SCRIPT
+       =========================== */
     const form          = $('#gtg-reg-form');
     const emailField    = $('#gtg_email');
     const otpInput      = $('#gtg_otp_input');
@@ -15,17 +19,11 @@ jQuery(function($) {
     form.on('submit', function(e) {
         const gst   = $('input[name="gtg_gst_number"]').val().trim();
         const phone = $('input[name="gtg_whatsapp"]').val().trim();
-        const gstRegex   = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/;
         const phoneRegex = /^[6-9]\d{9}$/;
 
         if (!phoneRegex.test(phone)) {
             e.preventDefault();
             alert('Please enter a valid 10-digit Indian mobile number starting with 6-9.');
-            return false;
-        }
-        if (!gstRegex.test(gst)) {
-            e.preventDefault();
-            alert('Please enter a valid 15-character GSTIN (e.g., 22ABCDE1234F1Z5).');
             return false;
         }
     });
@@ -98,4 +96,22 @@ jQuery(function($) {
         $inp.attr('type', isPwd ? 'text' : 'password');
         $(this).toggleClass('fa-eye fa-eye-slash');
     });
+
+    // ===== Hide "Become a Vendor" link for logged-in users =====
+    if ($('body').hasClass('logged-in')) {
+        $('a:contains("Become a Vendor")').closest('li').hide();
+    }
+
+
+    /* ===========================
+       PRODUCT FILTER TABS FIX
+       =========================== */
+    // Change "Out of stock" → "No stock"
+    $('ul.dokan-listing-filter.subsubsub li a').each(function() {
+        let text = $(this).text().trim();
+        if (text.includes("Out of stock")) {
+            $(this).text(text.replace("Out of stock", "No stock"));
+        }
+    });
+
 });
