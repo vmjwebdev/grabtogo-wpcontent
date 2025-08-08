@@ -1,4 +1,3 @@
-
 /* Refined Product Grid for Laptop View */
 @media (min-width: 1025px) {
   ul.products.columns-4 {
@@ -310,4 +309,168 @@ body.archive {
 /* Hide any extra eye icons *outside* your gtg-password-container */
 .gtg-registration-form i.fa-eye:not(.gtg-toggle-password) {
   display: none !important;
+}
+
+/* === FIX: Single product broken layout on mobile === */
+@media (max-width: 768px) {
+  /* Make the product container stop trying to be two columns */
+  .single-product div.product {
+    display: block !important;
+  }
+
+  /* Force gallery + summary to stack full width */
+  .single-product div.product .woocommerce-product-gallery,
+  .single-product div.product .summary {
+    float: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 20px !important;
+    padding: 0 !important;
+  }
+
+  /* Ensure images scale correctly */
+  .single-product .woocommerce-product-gallery,
+  .single-product .woocommerce-product-gallery__wrapper,
+  .single-product .woocommerce-product-gallery__image {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .single-product .woocommerce-product-gallery img {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
+  }
+}
+
+/* === Keep your shop grid from messing with single-product related items === */
+.single-product ul.products.columns-4 {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important; /* nicer mobile related grid */
+  gap: 16px !important;
+}
+@media (min-width: 769px) and (max-width: 1024px) {
+  .single-product ul.products.columns-4 {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+@media (min-width: 1025px) {
+  .single-product ul.products.columns-4 {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 24px !important;
+  }
+}
+/* === FIX: Single product broken layout on mobile === */
+@media (max-width: 768px) {
+  /* Stop two-column layout on small screens */
+  .single-product div.product {
+    display: block !important;
+  }
+
+  /* Stack gallery & summary */
+  .single-product div.product .woocommerce-product-gallery,
+  .single-product div.product .summary {
+    float: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 20px !important;
+    padding: 0 !important;
+  }
+
+  /* Image scaling */
+  .single-product .woocommerce-product-gallery,
+  .single-product .woocommerce-product-gallery__wrapper,
+  .single-product .woocommerce-product-gallery__image {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .single-product .woocommerce-product-gallery img {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
+  }
+}
+
+/* Horizontal filter tabs with Add New Product button */
+ul.dokan-listing-filter.subsubsub {
+    display: flex;
+    gap: 12px;
+    flex-wrap: nowrap;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+}
+
+ul.dokan-listing-filter.subsubsub li {
+    list-style: none;
+    font-size: 13px;
+    white-space: nowrap;
+    margin: 0;
+    padding: 0;
+}
+
+ul.dokan-listing-filter.subsubsub li a {
+    text-decoration: none;
+    color: #555;
+}
+
+ul.dokan-listing-filter.subsubsub li.active a {
+    font-weight: bold;
+    color: #4CAF50; /* Active green */
+}
+
+/* Add new product button inline with filters */
+ul.dokan-listing-filter.subsubsub + a.dokan-btn {
+    margin-left: auto; /* Push to far right */
+    font-size: 13px;
+    padding: 5px 10px;
+    white-space: nowrap;
+}
+
+/* On small screens, make sure everything wraps cleanly */
+@media (max-width: 600px) {
+    ul.dokan-listing-filter.subsubsub {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    ul.dokan-listing-filter.subsubsub + a.dokan-btn {
+        width: 100%;
+        text-align: center;
+        margin-left: 0;
+    }
+}
+/* Force full-width filters on mobile even after Select2 JS render */
+@media (max-width: 768px) {
+  /* Make form groups stack full width */
+  .dokan-product-date-filter .dokan-form-group {
+    width: 100% !important;
+    display: block !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* Force select2 containers to full width */
+  .dokan-product-date-filter .select2.select2-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
+
+  /* Target the actual selection box inside Select2 */
+  .dokan-product-date-filter .select2-selection {
+    width: 100% !important;
+  }
+
+  /* Ensure the native <select> stays full width if select2 fails */
+  .dokan-product-date-filter select {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Filter and Reset buttons full width */
+  .dokan-product-date-filter button.dokan-btn,
+  .dokan-product-date-filter a.dokan-btn {
+    width: 100% !important;
+    display: block !important;
+    margin-bottom: 8px !important;
+    text-align: center !important;
+  }
 }
