@@ -40,6 +40,36 @@ function grabtogo_enqueue_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'grabtogo_enqueue_assets' );
 
+
+// Add geolocation fix for GrabToGo app
+add_action('wp_enqueue_scripts', 'grabtogo_geolocation_fix', 999);
+function grabtogo_geolocation_fix() {
+    // Load the fix after all Listeo scripts
+    wp_enqueue_script(
+        'grabtogo-geolocation-fix',
+        get_stylesheet_directory_uri() . '/js/grabtogo-geolocation-fix.js',
+        array('jquery', 'listeo-custom', 'listeo-maps'),
+        '1.0.0',
+        true
+    );
+    
+    // Disable auto-geolocation for WebView
+    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if (strpos($user_agent, 'AppMySite') !== false || strpos($user_agent, 'wv') !== false) {
+        add_filter('listeo_maps_autolocate', '__return_false');
+    }
+}
+
+// Add WebView detection class to body
+add_filter('body_class', 'grabtogo_webview_body_class');
+function grabtogo_webview_body_class($classes) {
+    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if (strpos($user_agent, 'AppMySite') !== false || strpos($user_agent, 'wv') !== false) {
+        $classes[] = 'grabtogo-app-webview';
+    }
+    return $classes;
+}
+
 // ============ Redirect /my-account/ → /my-profile/ ============
 function grabtogo_redirect_my_account() {
     if ( is_page( 'my-account' ) ) {
@@ -776,3 +806,161 @@ function kerala_listings_ajax_filter() {
 }
 add_action('wp_ajax_kerala_listings_filter', 'kerala_listings_ajax_filter');
 add_action('wp_ajax_nopriv_kerala_listings_filter', 'kerala_listings_ajax_filter');
+
+/**
+ * GTG — Only admins can sell.
+ * Vendor (seller) products are view-only. Packages (plans) stay purchasable.
+ * Works with WooCommerce + Dokan + Listeo.
+ */
+
+/** Helper: does this user have one of the allowed roles (default: administrator only)? */
+if ( ! function_exists('gtg_user_has_role') ) {
+    function gtg_user_has_role( $user_id, array $roles ) {
+        $user = get_user_by( 'id', (int) $user_id );
+        if ( ! $user ) return false;
+        return (bool) array_intersect( $roles, (array) $user->roles );
+    }
+}
+
+/** Helper: get the author ID of a product (handles variations) */
+if ( ! function_exists('gtg_product_author_id') ) {
+    function gtg_product_author_id( $product ) {
+        if ( ! $product instanceof WC_Product ) {
+            $product = wc_get_product( $product );
+            if ( ! $product ) return 0;
+        }
+        $pid = $product->is_type( 'variation' ) ? $product->get_parent_id() : $product->get_id();
+        return (int) get_post_field( 'post_author', $pid );
+    }
+}
+
+/** Whitelist: products that should ALWAYS be purchasable (your plans/packages) */
+if ( ! function_exists('gtg_is_whitelisted_product') ) {
+    function gtg_is_whitelisted_product( $product ) {
+        if ( ! $product instanceof WC_Product ) {
+            $product = wc_get_product( $product );
+            if ( ! $product ) return false;
+        }
+        // 1) By product type (Listeo/Job package types)
+        $allowed_types = array(
+            'listing_package',
+            'listing_package_subscription',
+            'job_package',
+            'job_package_subscription',
+        );
+        if ( in_array( $product->get_type(), $allowed_types, true ) ) {
+            return true;
+        }
+        // 2) By category slug
+        $allowed_cats = array( 'packages', 'listing-packages', 'plans' );
+        $terms = get_the_terms( $product->get_id(), 'product_cat' );
+        if ( ! is_wp_error( $terms ) && $terms ) {
+            foreach ( $terms as $t ) {
+                if ( in_array( $t->slug, $allowed_cats, true ) ) return true;
+            }
+        }
+        // 3) By explicit product IDs (add your plan IDs here)
+        $allowed_ids = array( 137 ); // Limited Trial Plan
+        if ( in_array( (int) $product->get_id(), $allowed_ids, true ) ) {
+            return true;
+        }
+        return false;
+    }
+}
+
+/** CORE RULE: product is purchasable only if authored by an allowed role OR whitelisted. */
+add_filter( 'woocommerce_is_purchasable', function( $purchasable, $product ) {
+    // Allow whitelisted products (plans) regardless of author
+    if ( gtg_is_whitelisted_product( $product ) ) {
+        return true;
+    }
+    // Only admins (you can add 'shop_manager' to the array if you want)
+    $author_id = gtg_product_author_id( $product );
+    $allowed_roles = array( 'administrator' );
+    if ( $author_id && gtg_user_has_role( $author_id, $allowed_roles ) ) {
+        return true;
+    }
+    return false; // everyone else (vendors/sellers) -> not purchasable
+}, 9999, 2 );
+
+/** Block add-to-cart from any path (buttons, AJAX, direct URL) if not purchasable by rule */
+add_filter( 'woocommerce_add_to_cart_validation', function( $passed, $product_id ) {
+    $product = wc_get_product( $product_id );
+    if ( ! $product ) return false;
+    // If our rule says not purchasable, block with a friendly notice
+    if ( ! apply_filters( 'woocommerce_is_purchasable', $product->is_purchasable(), $product ) ) {
+        wc_add_notice( __( 'This item is showcased only and cannot be purchased online.', 'grabtogo' ), 'notice' );
+        return false;
+    }
+    return $passed;
+}, 9999, 2 );
+
+/** Hide loop add-to-cart button for non-purchasable products (clean UI) */
+add_filter( 'woocommerce_loop_add_to_cart_link', function( $button, $product ) {
+    // Keep normal for whitelisted/admin-authored products
+    if ( gtg_is_whitelisted_product( $product ) ) return $button;
+    $author_id = gtg_product_author_id( $product );
+    if ( ! $author_id || ! gtg_user_has_role( $author_id, array( 'administrator' ) ) ) {
+        return ''; // remove button
+    }
+    return $button;
+}, 9999, 2 );
+
+/** On single product, remove the add-to-cart form for non-admin authored, non-whitelisted products */
+add_action( 'wp', function() {
+    if ( ! is_product() ) return;
+    global $product;
+    if ( ! $product || gtg_is_whitelisted_product( $product ) ) return;
+
+    $author_id = gtg_product_author_id( $product );
+    if ( ! $author_id || ! gtg_user_has_role( $author_id, array( 'administrator' ) ) ) {
+        // Remove add to cart across types
+        remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_add_to_cart', 30 );
+        remove_action( 'woocommerce_simple_add_to_cart', 'woocommerce_simple_add_to_cart', 30 );
+        remove_action( 'woocommerce_grouped_add_to_cart', 'woocommerce_grouped_add_to_cart', 30 );
+        remove_action( 'woocommerce_variable_add_to_cart', 'woocommerce_variable_add_to_cart', 30 );
+        remove_action( 'woocommerce_external_add_to_cart', 'woocommerce_external_add_to_cart', 30 );
+        remove_action( 'woocommerce_single_variation', 'woocommerce_single_variation_add_to_cart_button', 20 );
+
+        add_action( 'woocommerce_single_product_summary', function() {
+            echo '<div class="gtg-view-only-note" style="margin-top:12px;font-weight:600;">'
+                . esc_html__( 'This item is showcased by the vendor and is not sold online.', 'grabtogo' )
+                . '</div>';
+        }, 31 );
+    }
+}, 20 );
+
+/** Cart guard: if a restricted item sneaks in (cache, direct URL), remove it */
+add_action( 'woocommerce_cart_loaded_from_session', function() {
+    if ( empty( WC()->cart ) || WC()->cart->is_empty() ) return;
+    $removed = false;
+    foreach ( WC()->cart->get_cart() as $key => $item ) {
+        $product = isset( $item['data'] ) ? $item['data'] : null;
+        if ( ! $product ) continue;
+        $is_allowed = gtg_is_whitelisted_product( $product );
+        if ( ! $is_allowed ) {
+            $author_id = gtg_product_author_id( $product );
+            if ( ! $author_id || ! gtg_user_has_role( $author_id, array( 'administrator' ) ) ) {
+                WC()->cart->remove_cart_item( $key );
+                $removed = true;
+            }
+        }
+    }
+    if ( $removed ) {
+        wc_add_notice( __( 'Some items were removed because they are display-only.', 'grabtogo' ), 'notice' );
+    }
+}, 20 );
+
+/** Optional: body class to help CSS hide residual UI on restricted singles */
+add_filter( 'body_class', function( $classes ) {
+    if ( is_product() ) {
+        global $product;
+        if ( $product && ! gtg_is_whitelisted_product( $product ) ) {
+            $author_id = gtg_product_author_id( $product );
+            if ( ! $author_id || ! gtg_user_has_role( $author_id, array( 'administrator' ) ) ) {
+                $classes[] = 'gtg-display-only-product';
+            }
+        }
+    }
+    return $classes;
+}, 20 );
