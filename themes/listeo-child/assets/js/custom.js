@@ -102,7 +102,6 @@ jQuery(function($) {
         $('a:contains("Become a Vendor")').closest('li').hide();
     }
 
-
     /* ===========================
        PRODUCT FILTER TABS FIX
        =========================== */
@@ -116,12 +115,10 @@ jQuery(function($) {
 
 });
 
-// Add this to your existing custom.js file
-
 jQuery(function($) {
-    
+
     // ============ Kerala Listings Grid Functionality ============
-    
+
     let currentFilters = {
         district: '',
         category: '',
@@ -130,33 +127,33 @@ jQuery(function($) {
         user_lng: 0,
         page: 1
     };
-    
+
     // Initialize Kerala listings functionality
     if ($('#kerala-listings-container').length) {
         initKeralaListings();
     }
-    
+
     function initKeralaListings() {
-        
+
         // Filter change handlers
         $('#kerala_district, #kerala_category, #kerala_price_range').on('change', function() {
             updateFilters();
             loadListings(true);
         });
-        
+
         // Near Me button
         $('#kerala_near_me').on('click', function() {
             getUserLocation();
         });
-        
+
         // Load More button
         $('#kerala_load_more').on('click', function() {
             currentFilters.page++;
             loadListings(false);
         });
-        
+
     }
-    
+
     // Update current filters from form inputs
     function updateFilters() {
         currentFilters.district = $('#kerala_district').val();
@@ -164,31 +161,31 @@ jQuery(function($) {
         currentFilters.price_range = $('#kerala_price_range').val();
         currentFilters.page = 1;
     }
-    
+
     // Get user's GPS location
     function getUserLocation() {
         const $btn = $('#kerala_near_me');
-        
+
         if (!navigator.geolocation) {
             alert('Geolocation is not supported by this browser.');
             return;
         }
-        
+
         $btn.text('Getting location...').prop('disabled', true);
-        
+
         navigator.geolocation.getCurrentPosition(
             function(position) {
                 currentFilters.user_lat = position.coords.latitude;
                 currentFilters.user_lng = position.coords.longitude;
                 currentFilters.page = 1;
-                
+
                 $btn.html('<i class="fa fa-location-arrow"></i> Near Me').prop('disabled', false);
                 loadListings(true);
             },
             function(error) {
                 console.error('Geolocation error:', error);
                 $btn.html('<i class="fa fa-location-arrow"></i> Near Me').prop('disabled', false);
-                
+
                 switch(error.code) {
                     case error.PERMISSION_DENIED:
                         alert('Location access denied. Please enable location services.');
@@ -211,20 +208,20 @@ jQuery(function($) {
             }
         );
     }
-    
+
     // Load listings via AJAX
     function loadListings(replace = true) {
         const $container = $('#kerala-listings-grid');
         const $loading = $('#kerala-loading');
         const $loadMore = $('#kerala_load_more');
-        
+
         if (replace) {
             $loading.show();
             $container.fadeOut(200);
         } else {
             $loadMore.text('Loading...').prop('disabled', true);
         }
-        
+
         $.ajax({
             url: gtg_ajax.ajax_url,
             type: 'POST',
@@ -244,7 +241,7 @@ jQuery(function($) {
                         $container.html(response.data.html);
                         $container.fadeIn(300);
                         $loading.hide();
-                        
+
                         // Scroll to results on mobile
                         if ($(window).width() < 768) {
                             $('html, body').animate({
@@ -255,17 +252,17 @@ jQuery(function($) {
                         $container.append(response.data.html);
                         $loadMore.text('Load More Deals').prop('disabled', false);
                     }
-                    
+
                     // Update load more button state
                     if (response.data.found_posts <= currentFilters.page * 12) {
                         $loadMore.hide();
                     } else {
                         $loadMore.show();
                     }
-                    
+
                     // Trigger scroll animations if any
                     $(window).trigger('scroll');
-                    
+
                 } else {
                     console.error('AJAX Error:', response);
                     if (replace) {
@@ -287,28 +284,66 @@ jQuery(function($) {
             }
         });
     }
-    
+
     // Add touch feedback for mobile
     $(document).on('touchstart', '.kerala-listing-card', function() {
         $(this).addClass('touching');
     });
-    
+
     $(document).on('touchend touchcancel', '.kerala-listing-card', function() {
         const $this = $(this);
         setTimeout(function() {
             $this.removeClass('touching');
         }, 150);
     });
-    
+
 });
 
-// Add touch feedback CSS
-const touchStyles = 
+// Add touch feedback CSS (as a string, then appended)
+(function(){
+    const touchStyles = `
 <style>
 .kerala-listing-card.touching {
     transform: scale(0.98);
     transition: transform 0.1s ease;
 }
-</style>
-;
-$('head').append(touchStyles);
+</style>`;
+    jQuery('head').append(touchStyles);
+})();
+
+jQuery(function($) {
+
+    // Function to fix cropped listing images
+    function fixListeoImages() {
+        $('.listing-item img').each(function() {
+            const $img = $(this);
+            let src = $img.attr('src');
+
+            if (src) {
+                // Remove the cropped size suffix to get full image
+                src = src.replace(/-\d+x\d+\.(jpg|jpeg|png|gif)$/i, '.$1');
+                $img.attr('src', src);
+
+                // Remove hardcoded dimensions
+                $img.removeAttr('width height');
+            }
+        });
+    }
+
+    // Fix images on page load
+    fixListeoImages();
+
+    // Fix images after AJAX pagination/filtering
+    $(document).ajaxComplete(function() {
+        setTimeout(fixListeoImages, 500);
+    });
+
+    // Watch for dynamic content changes
+    if (window.MutationObserver) {
+        const observer = new MutationObserver(fixListeoImages);
+        const container = document.querySelector('#listeo-listings-container');
+        if (container) {
+            observer.observe(container, { childList: true, subtree: true });
+        }
+    }
+});
