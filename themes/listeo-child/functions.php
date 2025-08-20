@@ -40,24 +40,128 @@ function grabtogo_enqueue_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'grabtogo_enqueue_assets' );
 
+// ============ ADD THIS FOR KERALA LISTINGS NONCE ============
+add_action('wp_enqueue_scripts', 'grabtogo_localize_kerala_nonce', 99);
+function grabtogo_localize_kerala_nonce() {
+    // Pass Kerala listings nonce to JavaScript
+    wp_localize_script('grabtogo-custom-js', 'kerala_ajax', array(
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('kerala_listings_nonce')
+    ));
+}
+// ============ FIX LEAFLET CONFLICTS & GEOLOCATION ============
+add_action('wp_footer', 'grabtogo_fix_leaflet_conflicts', 999);
+function grabtogo_fix_leaflet_conflicts() {
+    ?>
+    <script>
+    (function() {
+        // Wait for all Leaflet components to load
+        if (typeof L === 'undefined' || typeof jQuery === 'undefined') {
+            setTimeout(arguments.callee, 100);
+            return;
+        }
+        
+        // Disable auto-initialization of maps
+        if (window.L && window.L.Map) {
+            var mapInitCount = 0;
+            var originalInit = L.Map.prototype.initialize;
+            
+            L.Map.prototype.initialize = function() {
+                mapInitCount++;
+                if (mapInitCount > 1) {
+                    console.log('Preventing duplicate map initialization');
+                    return;
+                }
+                return originalInit.apply(this, arguments);
+            };
+        }
+        
+        // Stop continuous map events
+        jQuery(document).ready(function($) {
+            // Disable auto-pan and animations
+            if (window.map) {
+                window.map.keyboard.disable();
+                window.map.dragging.disable();
+                window.map.touchZoom.disable();
+                window.map.doubleClickZoom.disable();
+                window.map.scrollWheelZoom.disable();
+                
+                // Re-enable after initial load
+                setTimeout(function() {
+                    window.map.dragging.enable();
+                    window.map.touchZoom.enable();
+                    window.map.doubleClickZoom.enable();
+                    window.map.scrollWheelZoom.enable();
+                }, 2000);
+            }
+            
+            // Remove duplicate event bindings
+            $('.listeo-leaflet-map').off('moveend zoomend');
+            
+            // Force initialize GrabToGo if needed
+            if (window.GrabToGoGeo && !window.GrabToGoGeo.initialized) {
+                window.GrabToGoGeo.initialized = true;
+                
+                // Re-trigger the geolocation fix initialization
+                if (typeof window.requestGeolocation === 'function') {
+                    console.log('GrabToGo Geolocation Ready');
+                }
+            }
+        });
+    })();
+    </script>
+    <?php
+}
+
+// Ensure your geolocation fix loads LAST
+add_action('wp_enqueue_scripts', 'grabtogo_reorder_scripts', 9999);
+function grabtogo_reorder_scripts() {
+    // Remove and re-add to ensure it loads last
+    if (wp_script_is('grabtogo-geolocation-fix', 'enqueued')) {
+        wp_dequeue_script('grabtogo-geolocation-fix');
+        wp_enqueue_script(
+            'grabtogo-geolocation-fix',
+            get_stylesheet_directory_uri() . '/assets/js/grabtogo-geolocation-fix.js',
+            array('jquery', 'listeo-custom', 'listeo-leaflet'),
+            '2.0.1',
+            true
+        );
+    }
+}
 
 // Add geolocation fix for GrabToGo app
 add_action('wp_enqueue_scripts', 'grabtogo_geolocation_fix', 999);
 function grabtogo_geolocation_fix() {
-    // Load the fix after all Listeo scripts
+    // CRITICAL FIX: Correct path to assets/js/ instead of /js/
     wp_enqueue_script(
         'grabtogo-geolocation-fix',
-        get_stylesheet_directory_uri() . '/js/grabtogo-geolocation-fix.js',
+        get_stylesheet_directory_uri() . '/assets/js/grabtogo-geolocation-fix.js', // FIXED: was '/js/' now '/assets/js/'
         array('jquery', 'listeo-custom', 'listeo-maps'),
-        '1.0.0',
+        '2.0.0',
         true
     );
     
+    // Pass configuration to JavaScript
+    wp_localize_script('grabtogo-geolocation-fix', 'grabtogo_geo_config', array(
+        'is_webview' => grabtogo_is_webview(),
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'debug_mode' => (defined('WP_DEBUG') && WP_DEBUG),
+    ));
+    
     // Disable auto-geolocation for WebView
-    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    if (strpos($user_agent, 'AppMySite') !== false || strpos($user_agent, 'wv') !== false) {
+    if (grabtogo_is_webview()) {
         add_filter('listeo_maps_autolocate', '__return_false');
+        // Also disable through JavaScript
+        wp_add_inline_script('listeo-custom', 'if(typeof listeo_core !== "undefined") { listeo_core.maps_autolocate = false; }', 'before');
     }
+}
+
+// Add this new helper function right after the above function
+function grabtogo_is_webview() {
+    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    return (strpos($user_agent, 'AppMySite') !== false || 
+            strpos($user_agent, 'wv') !== false ||
+            strpos($user_agent, 'WebView') !== false);
 }
 
 // Add WebView detection class to body
@@ -78,7 +182,6 @@ function grabtogo_redirect_my_account() {
     }
 }
 add_action( 'template_redirect', 'grabtogo_redirect_my_account' );
-
 // ============ AJAX: Send OTP ============
 function gtg_send_otp() {
     $email = sanitize_email( $_POST['email'] );
@@ -964,3 +1067,141 @@ add_filter( 'body_class', function( $classes ) {
     }
     return $classes;
 }, 20 );
+
+
+
+/**
+ * IMPROVED - Output delete account button with better debugging
+ */
+function gtg_delete_account_button() {
+    ?>
+    <div class="gtg-delete-section">
+        <p class="warning-text" style="color: #d63638; margin-bottom: 15px;">
+            <?php esc_html_e('Warning: This action cannot be undone. All your data will be permanently deleted.', 'grabtogo'); ?>
+        </p>
+        
+        <form method="post" id="gtg-delete-form" action="">
+            <?php wp_nonce_field('gtg_delete_account', 'gtg_delete_account_nonce'); ?>
+            <input type="hidden" name="gtg_delete_account" value="1" />
+            <button type="submit" class="button gtg-delete-account-button" 
+                    style="background-color: #d63638; color: white; border: none; padding: 10px 20px;">
+                <?php esc_html_e('Delete Account', 'grabtogo'); ?>
+            </button>
+        </form>
+    </div>
+
+    <script>
+    jQuery(document).ready(function($) {
+        $('#gtg-delete-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            console.log('Delete form submitted'); // Debug log
+            
+            if (confirm('Are you absolutely sure you want to delete your account? This cannot be undone.')) {
+                if (confirm('This will permanently delete all your listings, products, and data. Continue?')) {
+                    console.log('User confirmed deletion, submitting form'); // Debug log
+                    
+                    // Actually submit the form
+                    this.submit();
+                } else {
+                    console.log('User cancelled at second confirmation'); // Debug log
+                }
+            } else {
+                console.log('User cancelled at first confirmation'); // Debug log
+            }
+        });
+    });
+    </script>
+    <?php
+}
+
+/**
+ * IMPROVED - Handle Account Deletion with debugging
+ */
+function gtg_handle_account_deletion() {
+    // Add debugging
+    if (isset($_POST['gtg_delete_account'])) {
+        error_log('GTG Delete Account: Form submitted');
+        error_log('GTG Delete Account: POST data: ' . print_r($_POST, true));
+    }
+    
+    // Only process if the delete button was submitted
+    if (!isset($_POST['gtg_delete_account']) || $_POST['gtg_delete_account'] !== '1') {
+        return;
+    }
+
+    error_log('GTG Delete Account: Processing deletion request');
+
+    // Verify nonce for security
+    if (!isset($_POST['gtg_delete_account_nonce']) || 
+        !wp_verify_nonce($_POST['gtg_delete_account_nonce'], 'gtg_delete_account')) {
+        error_log('GTG Delete Account: Nonce verification failed');
+        wp_die('Security check failed.');
+    }
+
+    error_log('GTG Delete Account: Nonce verified');
+
+    // Make sure user is logged in
+    if (!is_user_logged_in()) {
+        error_log('GTG Delete Account: User not logged in');
+        wp_die('You must be logged in to delete your account.');
+    }
+
+    // Get current user ID
+    $user_id = get_current_user_id();
+    error_log('GTG Delete Account: User ID: ' . $user_id);
+    
+    // Double-check we have a valid user ID
+    if (!$user_id) {
+        error_log('GTG Delete Account: Invalid user ID');
+        wp_die('Invalid user.');
+    }
+
+    // Prevent admins from deleting themselves accidentally
+    if (user_can($user_id, 'administrator')) {
+        error_log('GTG Delete Account: Admin attempted deletion');
+        wp_die('Administrator accounts cannot be deleted from the frontend.');
+    }
+
+    // Include the user functions
+    require_once ABSPATH . 'wp-admin/includes/user.php';
+    
+    error_log('GTG Delete Account: About to delete user ' . $user_id);
+    
+    // Delete the user account BEFORE logging out
+    $deleted = wp_delete_user($user_id);
+    
+    if ($deleted) {
+        error_log('GTG Delete Account: User deleted successfully');
+        // Log out the user after successful deletion
+        wp_logout();
+        // Redirect to homepage with success message
+        wp_redirect(add_query_arg('account_deleted', '1', home_url()));
+    } else {
+        error_log('GTG Delete Account: Failed to delete user');
+        // Redirect back with error
+        wp_redirect(add_query_arg('delete_error', '1', home_url('/my-profile/')));
+    }
+    exit;
+}
+add_action('init', 'gtg_handle_account_deletion');
+
+/**
+ * Show delete account messages with debugging
+ */
+function gtg_show_delete_messages() {
+    if (isset($_GET['account_deleted']) && $_GET['account_deleted'] == '1') {
+        echo '<div class="notification success closeable margin-bottom-35">';
+        echo '<p>' . esc_html__('Your account has been successfully deleted.', 'grabtogo') . '</p>';
+        echo '<a class="close" href="#"></a>';
+        echo '</div>';
+    }
+    
+    if (isset($_GET['delete_error']) && $_GET['delete_error'] == '1') {
+        echo '<div class="notification error closeable margin-bottom-35">';
+        echo '<p>' . esc_html__('There was an error deleting your account. Please try again or contact support.', 'grabtogo') . '</p>';
+        echo '<a class="close" href="#"></a>';
+        echo '</div>';
+    }
+}
+add_action('wp_head', 'gtg_show_delete_messages');
