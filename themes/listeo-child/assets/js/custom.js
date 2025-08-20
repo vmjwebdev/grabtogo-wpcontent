@@ -227,7 +227,7 @@ jQuery(function($) {
             type: 'POST',
             data: {
                 action: 'kerala_listings_filter',
-                nonce: '<?php echo wp_create_nonce("kerala_listings_nonce"); ?>',
+                nonce: (typeof kerala_ajax !== 'undefined' && kerala_ajax.nonce) ? kerala_ajax.nonce : '',
                 district: currentFilters.district,
                 category: currentFilters.category,
                 price_range: currentFilters.price_range,
@@ -346,4 +346,138 @@ jQuery(function($) {
             observer.observe(container, { childList: true, subtree: true });
         }
     }
+});
+
+
+// ============ GEOLOCATION FIX SAFETY NET ============
+jQuery(document).ready(function($) {
+    
+    // Extra safety: Wait for all scripts to load
+    setTimeout(function() {
+        // Re-bind Kerala Near Me button to use unified handler
+        $('#kerala_near_me').off('click.kerala').on('click.kerala', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const $btn = $(this);
+            
+            // Check if GrabToGo Geo is available
+            if (window.GrabToGoGeo && typeof window.requestGeolocation === 'function') {
+                $btn.html('<i class="fa fa-spinner fa-spin"></i> Getting location...').prop('disabled', true);
+                
+                window.requestGeolocation(
+                    function(position) {
+                        // Update Kerala filters
+                        if (window.currentFilters) {
+                            window.currentFilters.user_lat = position.coords.latitude;
+                            window.currentFilters.user_lng = position.coords.longitude;
+                            window.currentFilters.page = 1;
+                        }
+                        
+                        $btn.html('<i class="fa fa-location-arrow"></i> Near Me').prop('disabled', false);
+                        
+                        // Trigger Kerala listings load
+                        if (typeof loadListings === 'function') {
+                            loadListings(true);
+                        }
+                    },
+                    function(error) {
+                        $btn.html('<i class="fa fa-location-arrow"></i> Near Me').prop('disabled', false);
+                    }
+                );
+            }
+            
+            return false;
+        });
+        
+    }, 1000);
+    
+});
+
+// ============ GLOBAL SCOPE FIX FOR KERALA LISTINGS ============
+(function() {
+    // Make Kerala functions globally accessible for geolocation safety net
+    jQuery(function($) {
+        // Wait for Kerala listings to initialize
+        setTimeout(function() {
+            // Find and expose the loadListings function
+            const $container = $('#kerala-listings-container');
+            if ($container.length) {
+                // Create global reference to loadListings
+                window.keralaLoadListings = function(replace) {
+                    $('#kerala_district').trigger('change');
+                };
+                
+                // Expose current filters globally
+                window.keralaCurrentFilters = {
+                    district: '',
+                    category: '',
+                    price_range: '',
+                    user_lat: 0,
+                    user_lng: 0,
+                    page: 1
+                };
+                
+                // Update global filters when local ones change
+                $('#kerala_district, #kerala_category, #kerala_price_range').on('change', function() {
+                    window.keralaCurrentFilters.district = $('#kerala_district').val();
+                    window.keralaCurrentFilters.category = $('#kerala_category').val();
+                    window.keralaCurrentFilters.price_range = $('#kerala_price_range').val();
+                });
+            }
+        }, 1500);
+    });
+})();
+
+// ============ FIX GEOLOCATION SAFETY NET REFERENCES ============
+jQuery(document).ready(function($) {
+    setTimeout(function() {
+        // Fix the safety net to use correct global references
+        $('#kerala_near_me').off('click.kerala').on('click.kerala', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const $btn = $(this);
+            
+            if (window.GrabToGoGeo && typeof window.requestGeolocation === 'function') {
+                $btn.html('<i class="fa fa-spinner fa-spin"></i> Getting location...').prop('disabled', true);
+                
+                // Use the global requestGeolocation
+                const geoSuccess = function(position) {
+                    // Update Kerala filters using global reference
+                    if (window.keralaCurrentFilters) {
+                        window.keralaCurrentFilters.user_lat = position.coords.latitude;
+                        window.keralaCurrentFilters.user_lng = position.coords.longitude;
+                        window.keralaCurrentFilters.page = 1;
+                    }
+                    
+                    $btn.html('<i class="fa fa-location-arrow"></i> Near Me').prop('disabled', false);
+                    
+                    // Trigger Kerala listings reload
+                    if (window.keralaLoadListings) {
+                        window.keralaLoadListings(true);
+                    } else {
+                        // Fallback: trigger change event
+                        $('#kerala_district').trigger('change');
+                    }
+                };
+                
+                const geoError = function(error) {
+                    $btn.html('<i class="fa fa-location-arrow"></i> Near Me').prop('disabled', false);
+                    console.error('Geolocation error:', error);
+                };
+                
+                // Call geolocation with callbacks
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(geoSuccess, geoError, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 300000
+                    });
+                }
+            }
+            
+            return false;
+        });
+    }, 2000);
 });
